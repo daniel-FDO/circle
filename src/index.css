@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
+  --color-primary: #630ed4;
+  --color-primary-soft: #efe4ff;
+  --color-surface: #fff8f5;
+  --color-surface-low: #faf2ee;
+  --color-surface-high: #f4ece8;
+  --color-on-surface: #1e1b19;
+  --color-on-surface-variant: #4a4455;
+  --color-muted: #6f6879;
+  --color-line: #ece3de;
+}
+
+@layer base {
+  /* Utilities like outline-none still win, since they're in a later layer */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+}
+
+/* Honour reduced-motion preferences across the app */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
