@@ -34,7 +34,10 @@ const copyText = async (text: string) => {
 };
 
 // Fixed bar heights so the waveform looks the same on every render
-const waveform = [4, 8, 12, 7, 15, 10, 18, 12, 9, 14, 20, 16, 11, 7, 13, 18, 22, 15, 10, 6, 12, 17, 13, 8, 5, 10, 15, 11, 7, 4, 9, 14, 18, 12, 8, 5];
+const waveform = [
+  4, 8, 12, 7, 15, 10, 18, 12, 9, 14, 20, 16, 11, 7, 13, 18, 22, 15, 10, 6, 12,
+  17, 13, 8, 5, 10, 15, 11, 7, 4, 9, 14, 18, 12, 8, 5,
+];
 
 const Media = ({ media }: { media: PostMedia }) => {
   const [copied, setCopied] = useState(false);
@@ -42,7 +45,12 @@ const Media = ({ media }: { media: PostMedia }) => {
   if (media.type === "images") {
     const [first, ...rest] = media.images;
     if (rest.length === 0) {
-      return <FallbackImage image={first} className="mt-3 w-full aspect-[16/9] rounded-lg" />;
+      return (
+        <FallbackImage
+          image={first}
+          className="mt-3 w-full aspect-[16/9] rounded-lg"
+        />
+      );
     }
     return (
       <div className="mt-3 grid grid-cols-[1.35fr_1fr] grid-rows-2 gap-1.5 h-64 sm:h-80 rounded-lg overflow-hidden">
@@ -58,7 +66,9 @@ const Media = ({ media }: { media: PostMedia }) => {
     return (
       <div className="mt-3 rounded-lg border border-line bg-surface-low overflow-hidden">
         <div className="flex items-center justify-between px-3 py-2 border-b border-line">
-          <span className="font-mono text-xs text-on-surface-variant">{media.filename}</span>
+          <span className="font-mono text-xs text-on-surface-variant">
+            {media.filename}
+          </span>
           <button
             type="button"
             onClick={async () => {
@@ -75,7 +85,10 @@ const Media = ({ media }: { media: PostMedia }) => {
         <pre className="px-3 py-3 overflow-x-auto font-mono text-[12.5px] leading-relaxed text-on-surface-variant">
           <code>
             {media.code.split("\n").map((ln, i) => (
-              <span key={i} className={`block ${/^\S.*\{$/.test(ln) || ln.startsWith("export") ? "text-primary" : ""}`}>
+              <span
+                key={i}
+                className={`block ${/^\S.*\{$/.test(ln) || ln.startsWith("export") ? "text-primary" : ""}`}
+              >
                 {ln || " "}
               </span>
             ))}
@@ -103,10 +116,16 @@ const Media = ({ media }: { media: PostMedia }) => {
         </div>
         <div className="mt-1.5 flex items-center gap-[3px] h-6" aria-hidden>
           {waveform.map((h, i) => (
-            <span key={i} className="flex-1 max-w-1 rounded-full bg-primary/35" style={{ height: `${h + 2}px` }} />
+            <span
+              key={i}
+              className="flex-1 max-w-1 rounded-full bg-primary/35"
+              style={{ height: `${h + 2}px` }}
+            />
           ))}
         </div>
-        <p className="mt-1 text-[11px] text-muted">Preview unavailable in this prototype</p>
+        <p className="mt-1 text-[11px] text-muted">
+          Preview unavailable in this prototype
+        </p>
       </div>
     </div>
   );
@@ -164,7 +183,11 @@ const FeedPostCard = ({
   return (
     <article className="bg-white border border-line rounded-xl p-4 shadow-[0_1px_2px_rgba(30,27,25,0.04)]">
       <header className="flex items-start gap-3">
-        <Avatar name={post.author} src={post.avatar} className="w-10 h-10 text-sm" />
+        <Avatar
+          name={post.author}
+          src={post.avatar}
+          className="w-10 h-10 text-sm"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm leading-tight">
             <span className="font-bold text-on-surface">{post.author}</span>{" "}
@@ -276,7 +299,9 @@ const FeedPostCard = ({
         <button
           type="button"
           onClick={async () => {
-            if (await copyText(`${post.author} (@${post.handle}): ${post.body}`)) {
+            if (
+              await copyText(`${post.author} (@${post.handle}): ${post.body}`)
+            ) {
               setShared(true);
               setTimeout(() => setShared(false), 1500);
             }
@@ -286,7 +311,9 @@ const FeedPostCard = ({
           className={`${actionClass} hover:text-primary`}
         >
           <ShareIcon />
-          {shared && <span className="text-xs font-semibold text-primary">Copied</span>}
+          {shared && (
+            <span className="text-xs font-semibold text-primary">Copied</span>
+          )}
         </button>
       </div>
 
@@ -294,9 +321,14 @@ const FeedPostCard = ({
         <div className="mt-2 pt-3 border-t border-line space-y-3">
           {replies.map((reply) => (
             <div key={reply.id} className="flex gap-2.5">
-              <Avatar name={profile.displayName} src={profile.avatar} className="w-7 h-7 text-[11px]" />
+              <Avatar
+                name={profile.displayName}
+                src={profile.avatar}
+                className="w-7 h-7 text-[11px]"
+              />
               <p className="text-sm bg-surface-low rounded-lg px-3 py-2 flex-1 min-w-0 break-words">
-                <span className="font-bold">{profile.displayName}</span> {reply.text}
+                <span className="font-bold">{profile.displayName}</span>{" "}
+                {reply.text}
               </p>
             </div>
           ))}
@@ -307,7 +339,11 @@ const FeedPostCard = ({
               sendReply();
             }}
           >
-            <Avatar name={profile.displayName} src={profile.avatar} className="w-7 h-7 text-[11px]" />
+            <Avatar
+              name={profile.displayName}
+              src={profile.avatar}
+              className="w-7 h-7 text-[11px]"
+            />
             <label htmlFor={`reply-${post.id}`} className="sr-only">
               Reply to {post.author}
             </label>
@@ -319,7 +355,10 @@ const FeedPostCard = ({
               className="flex-1 min-w-0 h-9 rounded-full bg-surface-low border border-line px-4 text-sm outline-none focus:border-primary/40 focus:bg-white"
             />
             {draft.trim() && (
-              <button type="submit" className="h-9 px-4 rounded-full bg-primary text-white text-xs font-bold">
+              <button
+                type="submit"
+                className="h-9 px-4 rounded-full bg-primary text-white text-xs font-bold"
+              >
                 Reply
               </button>
             )}
