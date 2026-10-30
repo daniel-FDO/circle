@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import Composer from "../components/home/Composer";
-import FeedList from "../components/home/FeedList";
+import FeedList, { type LikeSource } from "../components/home/FeedList";
 import PageHeader from "../components/home/PageHeader";
 import { card } from "../components/home/styles";
 import { SlidersIcon } from "../components/Icons";
 import { featuredTopics } from "../data/topics";
 import { useFeed, type ComposeState } from "../layouts/feedContext";
+import { createPost, fetchFeedPosts, setPostLike, SignedOutError, type FeedPage } from "../lib/posts";
 
 type Tab = "forYou" | "following";
 type Order = "curated" | "latest";
@@ -16,8 +17,48 @@ const tabs: [Tab, string][] = [
   ["following", "Following"],
 ];
 
+type FeedState = { status: "loading" } | { status: "error" } | ({ status: "ready" } & FeedPage);
+
+type LikeError = "signed-out" | "failed";
+
+const withMember = (set: Set<string>, id: string, member: boolean) => {
+  const next = new Set(set);
+  if (member) next.add(id);
+  else next.delete(id);
+  return next;
+};
+
+const FeedSkeleton = () => (
+  <div aria-busy="true" className="space-y-4">
+    <p role="status" className="sr-only">
+      Loading posts…
+    </p>
+    {[0, 1, 2].map((i) => (
+      <div key={i} className={`${card} p-4 animate-pulse`} aria-hidden>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-surface-high" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-1/3 rounded bg-surface-high" />
+            <div className="h-2.5 w-1/5 rounded bg-surface-low" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="h-3 rounded bg-surface-low" />
+          <div className="h-3 w-4/5 rounded bg-surface-low" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
 const Home = () => {
-  const { profile, curation, posts, following, publish } = useFeed();
+  const { profile, curation, following, hidden } = useFeed();
+  const [feedState, setFeedState] = useState<FeedState>({ status: "loading" });
+  const [reloads, setReloads] = useState(0);
+  const [likePending, setLikePending] = useState<Set<string>>(new Set());
+  const [likeError, setLikeError] = useState<LikeError | null>(null);
+  // Read synchronously so a fast double click can't start a second request before re-render
+  const likesInFlight = useRef(new Set<string>());
   const [tab, setTab] = useState<Tab>("forYou");
   const [order, setOrder] = useState<Order>("curated");
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -30,6 +71,70 @@ const Home = () => {
       composerRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }, [location.key, location.state]);
+
+  useEffect(() => {
+    let active = true;
+    fetchFeedPosts()
+      .then((page) => {
+        if (active) setFeedState({ status: "ready", ...page });
+      })
+      .catch(() => {
+        if (active) setFeedState({ status: "error" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloads]);
+
+  const retry = () => {
+    setFeedState({ status: "loading" });
+    setReloads((n) => n + 1);
+  };
+
+  const publish = async (body: string) => {
+    try {
+      await createPost(body);
+    } catch {
+      return "We couldn't publish your post. Your draft is still here, so please try again.";
+    }
+    setTab("forYou");
+    // The post is saved either way; a failed refresh shows the feed's own retry
+    try {
+      setFeedState({ status: "ready", ...(await fetchFeedPosts()) });
+    } catch {
+      setFeedState({ status: "error" });
+    }
+    return null;
+  };
+
+  const toggleLike = async (postId: string) => {
+    if (feedState.status !== "ready" || likesInFlight.current.has(postId)) return;
+    const like = !feedState.liked.has(postId);
+    likesInFlight.current.add(postId);
+    setLikePending((s) => withMember(s, postId, true));
+    setLikeError(null);
+    try {
+      await setPostLike(postId, like);
+      // Applied to the latest state, which a feed refresh may have replaced meanwhile
+      setFeedState((s) => (s.status === "ready" ? { ...s, liked: withMember(s.liked, postId, like) } : s));
+    } catch (error) {
+      setLikeError(error instanceof SignedOutError ? "signed-out" : "failed");
+    } finally {
+      likesInFlight.current.delete(postId);
+      setLikePending((s) => withMember(s, postId, false));
+    }
+  };
+
+  const likes: LikeSource | undefined =
+    feedState.status === "ready" ? { liked: feedState.liked, pending: likePending, toggle: toggleLike } : undefined;
+
+  // Own posts use the avatar from this browser's profile; the posts table has no avatar yet
+  const posts =
+    feedState.status === "ready"
+      ? feedState.posts
+          .filter((p) => !hidden.has(p.id))
+          .map((p) => (p.mine ? { ...p, avatar: profile.avatar } : p))
+      : [];
 
   let feed;
   if (tab === "following") {
@@ -80,15 +185,48 @@ const Home = () => {
           profile={profile}
           topicOptions={curation.topics.length ? curation.topics : featuredTopics}
           textareaRef={composerRef}
-          onPublish={(draft) => {
-            publish(draft);
-            setTab("forYou");
-          }}
+          textOnly
+          onPublish={(draft) => publish(draft.body)}
         />
-        <FeedList
-          posts={feed}
-          emptyMessage={tab === "following" ? "Follow a few people to fill this tab." : "Nothing here yet."}
-        />
+        {feedState.status === "loading" ? (
+          <FeedSkeleton />
+        ) : feedState.status === "error" ? (
+          <div role="alert" className={`${card} p-8 text-center`}>
+            <p className="text-sm text-on-surface-variant">We couldn't load the feed. Check your connection and try again.</p>
+            <button
+              type="button"
+              onClick={retry}
+              className="mt-4 h-9 px-5 rounded-full bg-primary text-white text-sm font-bold hover:brightness-110 transition"
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <>
+            {likeError && (
+              <p role="alert" className={`${card} px-4 py-3 text-sm font-semibold text-red-600`}>
+                {likeError === "signed-out" ? (
+                  <>
+                    Your session has ended.{" "}
+                    <Link to="/sign-in" className="text-primary hover:underline">
+                      Sign in
+                    </Link>{" "}
+                    to like posts.
+                  </>
+                ) : (
+                  "We couldn't update that like. Please try again."
+                )}
+              </p>
+            )}
+            <FeedList
+              likes={likes}
+              posts={feed}
+              emptyMessage={
+                tab === "following" ? "Follow a few people to fill this tab." : "No posts yet — start the conversation."
+              }
+            />
+          </>
+        )}
       </div>
     </>
   );

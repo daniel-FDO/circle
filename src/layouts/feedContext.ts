@@ -29,6 +29,8 @@ export type FeedContext = {
   restoreBookmark: (id: string, savedAt: string) => void;
   createShelf: (name: string, itemIds: string[]) => string;
   toggleRepost: (id: string) => void;
+  // Ids hidden with "Hide this post"; Home applies it to posts loaded from Supabase
+  hidden: Set<string>;
   hidePost: (id: string) => void;
   addReply: (id: string, text: string) => void;
   publish: (draft: Draft) => void;

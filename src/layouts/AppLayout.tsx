@@ -163,6 +163,7 @@ const AppLayout = ({ profile, curation, joinedAt, onProfileChange, onCurationCha
       return id;
     },
     toggleRepost: (id) => setReposted((s) => toggleIn(s, id)),
+    hidden,
     hidePost: (id) => setHidden((s) => new Set(s).add(id)),
     addReply: (id, text) =>
       setReplies((r) => ({ ...r, [id]: [...(r[id] ?? []), { id: `${Date.now()}`, text }] })),

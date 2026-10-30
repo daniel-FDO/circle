@@ -4,13 +4,21 @@ import { useFeed } from "../../layouts/feedContext";
 import type { FeedPost } from "../../data/posts";
 import { card } from "./styles";
 
+// Lets a page supply likes stored elsewhere (Home uses Supabase) instead of the local context
+export type LikeSource = {
+  liked: Set<string>;
+  pending: Set<string>;
+  toggle: (postId: string) => void;
+};
+
 type FeedListProps = {
   posts: FeedPost[];
   emptyMessage: string;
+  likes?: LikeSource;
 };
 
 // Applies the shared search and topic filters, then renders the posts
-const FeedList = ({ posts, emptyMessage }: FeedListProps) => {
+const FeedList = ({ posts, emptyMessage, likes }: FeedListProps) => {
   const feed = useFeed();
   const { query, topicFilter } = feed;
 
@@ -60,12 +68,13 @@ const FeedList = ({ posts, emptyMessage }: FeedListProps) => {
             key={post.id}
             post={post}
             profile={feed.profile}
-            liked={feed.liked.has(post.id)}
+            liked={(likes?.liked ?? feed.liked).has(post.id)}
+            likePending={likes?.pending.has(post.id)}
             saved={feed.saved.has(post.id)}
             reposted={feed.reposted.has(post.id)}
             replies={feed.replies[post.id] ?? []}
             defaultReplyOpen={i === 0 && !post.mine}
-            onLike={() => feed.toggleLike(post.id)}
+            onLike={() => (likes ? likes.toggle(post.id) : feed.toggleLike(post.id))}
             onSave={() => feed.toggleSave(post.id)}
             onRepost={() => feed.toggleRepost(post.id)}
             onHide={() => feed.hidePost(post.id)}

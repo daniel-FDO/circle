@@ -116,6 +116,8 @@ type FeedPostCardProps = {
   post: FeedPost;
   profile: Profile;
   liked: boolean;
+  // True while this post's like is being saved; the button ignores clicks until it settles
+  likePending?: boolean;
   saved: boolean;
   reposted: boolean;
   replies: Reply[];
@@ -135,6 +137,7 @@ const FeedPostCard = ({
   post,
   profile,
   liked,
+  likePending = false,
   saved,
   reposted,
   replies,
@@ -235,9 +238,11 @@ const FeedPostCard = ({
         <button
           type="button"
           onClick={onLike}
+          disabled={likePending}
+          aria-busy={likePending}
           aria-pressed={liked}
           aria-label={`${liked ? "Unlike" : "Like"} (${post.likes + (liked ? 1 : 0)} likes)`}
-          className={`${actionClass} ${liked ? "text-rose-600" : "hover:text-rose-600"}`}
+          className={`${actionClass} ${liked ? "text-rose-600" : "hover:text-rose-600"} disabled:opacity-60 disabled:cursor-wait`}
         >
           <HeartIcon filled={liked} /> {post.likes + (liked ? 1 : 0)}
         </button>

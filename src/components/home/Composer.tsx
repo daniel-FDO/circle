@@ -24,13 +24,16 @@ type ComposerProps = {
   profile: Profile;
   topicOptions: string[];
   textareaRef: Ref<HTMLTextAreaElement>;
-  onPublish: (draft: Draft) => void;
+  // Resolves to an error message to keep the draft, or null once the post is saved
+  onPublish: (draft: Draft) => Promise<string | null>;
+  // Hides topics, attachments and audience when the destination only stores text
+  textOnly?: boolean;
 };
 
 const iconButton =
   "w-9 h-9 rounded-full flex items-center justify-center transition disabled:opacity-35 disabled:cursor-not-allowed";
 
-const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerProps) => {
+const Composer = ({ profile, topicOptions, textareaRef, onPublish, textOnly = false }: ComposerProps) => {
   const [body, setBody] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
   const [image, setImage] = useState<Draft["image"]>(null);
@@ -38,6 +41,8 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
   const [code, setCode] = useState("");
   const [audience, setAudience] = useState(audiences[0]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const remaining = MAX_POST_LENGTH - body.length;
@@ -54,9 +59,17 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
     e.target.value = "";
   };
 
-  const publish = () => {
-    if (!canPublish) return;
-    onPublish({ body: body.trim(), topics, image, code: codeOpen ? code : "", audience });
+  const publish = async () => {
+    if (!canPublish || saving) return;
+    setSaving(true);
+    setError(null);
+    const failure = await onPublish({ body: body.trim(), topics, image, code: codeOpen ? code : "", audience });
+    setSaving(false);
+    // Keep the draft so nothing is lost; the user can retry
+    if (failure) {
+      setError(failure);
+      return;
+    }
     setBody("");
     setTopics([]);
     setImage(null);
@@ -85,7 +98,12 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
             ref={textareaRef}
             rows={2}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            readOnly={saving}
+            aria-busy={saving}
+            onChange={(e) => {
+              setBody(e.target.value);
+              setError(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) publish();
             }}
@@ -93,60 +111,62 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
             className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-on-surface placeholder:text-muted outline-none pt-2"
           />
 
-          <div className="mt-1 flex flex-wrap items-center gap-2 relative">
-            {topics.map((topic) => (
-              <span
-                key={topic}
-                className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-md bg-primary-soft text-primary text-xs font-semibold"
-              >
-                #{topic.replace(/[^A-Za-z0-9]/g, "")}
-                <button
-                  type="button"
-                  onClick={() => setTopics((t) => t.filter((x) => x !== topic))}
-                  aria-label={`Remove topic ${topic}`}
-                  className="w-5 h-5 rounded flex items-center justify-center hover:bg-primary/10"
+          {!textOnly && (
+            <div className="mt-1 flex flex-wrap items-center gap-2 relative">
+              {topics.map((topic) => (
+                <span
+                  key={topic}
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-md bg-primary-soft text-primary text-xs font-semibold"
                 >
-                  <CloseIcon className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-            {topics.length < MAX_TOPICS && available.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setPickerOpen((o) => !o)}
-                aria-expanded={pickerOpen}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-dashed border-line text-xs font-semibold text-muted hover:text-on-surface hover:border-muted"
-              >
-                <PlusIcon className="w-3 h-3" /> Add topic
-              </button>
-            )}
-            {pickerOpen && (
-              <>
+                  #{topic.replace(/[^A-Za-z0-9]/g, "")}
+                  <button
+                    type="button"
+                    onClick={() => setTopics((t) => t.filter((x) => x !== topic))}
+                    aria-label={`Remove topic ${topic}`}
+                    className="w-5 h-5 rounded flex items-center justify-center hover:bg-primary/10"
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {topics.length < MAX_TOPICS && available.length > 0 && (
                 <button
                   type="button"
-                  aria-label="Close topic list"
-                  className="fixed inset-0 z-10 cursor-default"
-                  onClick={() => setPickerOpen(false)}
-                />
-                <ul className="absolute left-0 top-full mt-1 z-20 w-56 max-h-60 overflow-y-auto bg-white border border-line rounded-lg shadow-lg py-1">
-                  {available.map((topic) => (
-                    <li key={topic}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTopics((t) => [...t, topic]);
-                          setPickerOpen(false);
-                        }}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-low"
-                      >
-                        {topic}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+                  onClick={() => setPickerOpen((o) => !o)}
+                  aria-expanded={pickerOpen}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-dashed border-line text-xs font-semibold text-muted hover:text-on-surface hover:border-muted"
+                >
+                  <PlusIcon className="w-3 h-3" /> Add topic
+                </button>
+              )}
+              {pickerOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Close topic list"
+                    className="fixed inset-0 z-10 cursor-default"
+                    onClick={() => setPickerOpen(false)}
+                  />
+                  <ul className="absolute left-0 top-full mt-1 z-20 w-56 max-h-60 overflow-y-auto bg-white border border-line rounded-lg shadow-lg py-1">
+                    {available.map((topic) => (
+                      <li key={topic}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTopics((t) => [...t, topic]);
+                            setPickerOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-surface-low"
+                        >
+                          {topic}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
 
           {image && (
             <div className="mt-3 rounded-lg border border-line overflow-hidden">
@@ -185,46 +205,50 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
 
           <div className="mt-3 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1 text-primary">
-              <button
-                type="button"
-                onClick={() => fileInput.current?.click()}
-                disabled={codeOpen}
-                aria-label="Attach an image"
-                title="Attach an image"
-                className={`${iconButton} hover:bg-primary-soft`}
-              >
-                <ImageIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCodeOpen((o) => !o)}
-                disabled={!!image}
-                aria-pressed={codeOpen}
-                aria-label="Add a code snippet"
-                title="Add a code snippet"
-                className={`${iconButton} ${codeOpen ? "bg-primary-soft" : "hover:bg-primary-soft"}`}
-              >
-                <CodeIcon />
-              </button>
-              <input ref={fileInput} type="file" accept="image/*" onChange={onFile} className="hidden" />
-
-              <div className="relative ml-1">
-                <GlobeIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <label htmlFor="audience" className="sr-only">
-                  Who can reply
-                </label>
-                <select
-                  id="audience"
-                  value={audience}
-                  onChange={(e) => setAudience(e.target.value)}
-                  className="appearance-none h-8 pl-7 pr-7 rounded-full bg-primary-soft/60 text-xs font-semibold text-primary outline-none cursor-pointer"
+              {!textOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={codeOpen}
+                  aria-label="Attach an image"
+                  title="Attach an image"
+                  className={`${iconButton} hover:bg-primary-soft`}
                 >
-                  {audiences.map((a) => (
-                    <option key={a}>{a}</option>
-                  ))}
-                </select>
-                <ChevronDownIcon className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              </div>
+                  <ImageIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCodeOpen((o) => !o)}
+                  disabled={!!image}
+                  aria-pressed={codeOpen}
+                  aria-label="Add a code snippet"
+                  title="Add a code snippet"
+                  className={`${iconButton} ${codeOpen ? "bg-primary-soft" : "hover:bg-primary-soft"}`}
+                >
+                  <CodeIcon />
+                </button>
+                <input ref={fileInput} type="file" accept="image/*" onChange={onFile} className="hidden" />
+
+                <div className="relative ml-1">
+                  <GlobeIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <label htmlFor="audience" className="sr-only">
+                    Who can reply
+                  </label>
+                  <select
+                    id="audience"
+                    value={audience}
+                    onChange={(e) => setAudience(e.target.value)}
+                    className="appearance-none h-8 pl-7 pr-7 rounded-full bg-primary-soft/60 text-xs font-semibold text-primary outline-none cursor-pointer"
+                  >
+                    {audiences.map((a) => (
+                      <option key={a}>{a}</option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              </>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -252,13 +276,20 @@ const Composer = ({ profile, topicOptions, textareaRef, onPublish }: ComposerPro
               <button
                 type="button"
                 onClick={publish}
-                disabled={!canPublish}
+                disabled={!canPublish || saving}
+                aria-busy={saving}
                 className="h-9 px-5 rounded-full bg-primary text-white text-sm font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                Publish
+                {saving ? "Publishing…" : "Publish"}
               </button>
             </div>
           </div>
+
+          {error && (
+            <p role="alert" className="mt-2 text-sm font-semibold text-red-600">
+              {error}
+            </p>
+          )}
         </div>
       </div>
     </section>

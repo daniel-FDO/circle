@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, NavLink } from "react-router";
 import Avatar from "../Avatar";
+import SignOutButton from "../SignOutButton";
 import {
   BellIcon,
   BookmarkIcon,
@@ -144,6 +145,10 @@ export const Sidebar = ({ profile, unread, onCreatePost }: SidebarProps) => {
               >
                 Edit profile
               </Link>
+              <SignOutButton
+                role="menuitem"
+                className="block w-full text-left px-3 py-2 text-sm hover:bg-surface-low disabled:opacity-60"
+              />
             </div>
           </>
         )}

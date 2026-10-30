@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import PageHeader from "../components/home/PageHeader";
 import { card } from "../components/home/styles";
 import ProfileFields from "../components/ProfileFields";
+import SignOutButton from "../components/SignOutButton";
 import TopicsModal from "../components/TopicsModal";
 import { PenIcon } from "../components/Icons";
 import { allTopics } from "../data/topics";
@@ -118,6 +119,18 @@ const ProfileEdit = () => {
             </button>
           </div>
         </div>
+
+        <section className={`${card} p-5 md:p-6 flex flex-wrap items-center justify-between gap-3`} aria-labelledby="account-heading">
+          <div>
+            <h2 id="account-heading" className="font-serif text-lg font-semibold">
+              Account
+            </h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Sign out of Circle on this device.</p>
+          </div>
+          <div>
+            <SignOutButton className="h-10 px-5 rounded-full border border-line text-sm font-semibold text-on-surface-variant hover:bg-surface-high disabled:opacity-60" />
+          </div>
+        </section>
       </div>
     </>
   );
